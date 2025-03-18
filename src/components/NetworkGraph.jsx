@@ -1,6 +1,26 @@
 import React, { useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 
+// GraphQL Query: I fetch initial topology data on page load
+const TOPOLOGY_QUERY = gql`
+  query GetTopology {
+    networkTopology {
+      nodes { id }
+      links { source target localPort remotePort }
+    }
+  }
+`;
+
+// GraphQL Subscription: I listen for real-time topology updates
+const TOPOLOGY_UPDATED_SUBSCRIPTION = gql`
+  subscription OnTopologyUpdated {
+    topologyUpdated {
+      nodes { id }
+      links { source target localPort remotePort }
+    }
+  }
+`;
+
 function NetworkGraph({ width, height, data }) {
   const svgRef = useRef(null);
 
