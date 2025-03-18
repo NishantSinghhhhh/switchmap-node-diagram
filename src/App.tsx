@@ -1,8 +1,9 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import NetworkGraph from './components/NetworkGraph';
-import sampleData from './components/data';
 import DeviceMovements from './components/DeviceMovements';
+import AppHeader from './components/AppHeader';
+import sampleData from './components/data';
 
 // Define the proper data type
 interface TopologyData {
@@ -21,29 +22,37 @@ interface TopologyData {
 const App: React.FC = () => {
   return (
     <Router>
-      <div className="App">
-        <header className="App-header">
-          <h1>LLDP Network Topology</h1>
-          {/* Navigation Links */}
-          <nav>
-            <ul>
-              <li><Link to="/">Home</Link></li>
-              <li><Link to="/movements">Device Movements</Link></li>
-            </ul>
-          </nav>
-        </header>
-
-        {/* Routes */}
-        <Routes>
-          <Route path="/" element={
-            <NetworkGraph 
-              width={800} 
-              height={600} 
-              data={sampleData as TopologyData} 
-            />
-          } />
-          <Route path="/movements" element={<DeviceMovements />} />
-        </Routes>
+      <div className="App" style={{ 
+        backgroundColor: '#f5f7fa',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        <AppHeader />
+        
+        <div style={{ flex: 1, padding: '20px' }}>
+          <Routes>
+            <Route path="/" element={
+              <NetworkGraph 
+                width={800} 
+                height={600} 
+                data={sampleData as TopologyData} 
+              />
+            } />
+            <Route path="/movements" element={<DeviceMovements />} />
+          </Routes>
+        </div>
+        
+        <footer style={{
+          textAlign: 'center',
+          padding: '20px',
+          borderTop: '1px solid #eaeaea',
+          backgroundColor: 'white',
+          fontSize: '14px',
+          color: '#999'
+        }}>
+          LLDP Network Manager © {new Date().getFullYear()}
+        </footer>
       </div>
     </Router>
   );
