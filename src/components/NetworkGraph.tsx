@@ -1,30 +1,40 @@
 import React, { useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 
-// GraphQL Query: I fetch initial topology data on page load
-const TOPOLOGY_QUERY = gql`
-  query GetTopology {
-    networkTopology {
-      nodes { id }
-      links { source target localPort remotePort }
-    }
-  }
-`;
+// Define types for our data
+interface NodeDatum {
+  id: string;
+  group?: number;
+  x?: number;
+  y?: number;
+  fx?: number | null;
+  fy?: number | null;
+}
 
-// GraphQL Subscription: I listen for real-time topology updates
-const TOPOLOGY_UPDATED_SUBSCRIPTION = gql`
-  subscription OnTopologyUpdated {
-    topologyUpdated {
-      nodes { id }
-      links { source target localPort remotePort }
-    }
-  }
-`;
+interface LinkDatum {
+  source: string | NodeDatum;
+  target: string | NodeDatum;
+  localPort?: string;
+  remotePort?: string;
+}
 
-function NetworkGraph({ width, height, data }) {
-  const svgRef = useRef(null);
+interface TopologyData {
+  nodes: NodeDatum[];
+  links: LinkDatum[];
+}
+
+interface NetworkGraphProps {
+  width: number;
+  height: number;
+  data: TopologyData;
+}
+
+function NetworkGraph({ width, height, data }: NetworkGraphProps) {
+  const svgRef = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
+    if (!svgRef.current) return;
+    
     // 1. Select or create the SVG element
     const svg = d3.select(svgRef.current);
     
@@ -34,11 +44,9 @@ function NetworkGraph({ width, height, data }) {
     const { nodes, links } = data;
     
     // Add group property to nodes based on their ID prefix
-    // This allows us to color-code nodes by groups
     nodes.forEach(node => {
       const switchNum = node.id.charAt(node.id.length - 1);
       // Group nodes by the last character of their ID
-      // Creating 3 groups: blue, orange, light blue
       if (switchNum <= 'G') {
         node.group = 1; // Blue group
       } else if (switchNum <= 'O') {
@@ -49,13 +57,16 @@ function NetworkGraph({ width, height, data }) {
     });
     
     // Define color scale based on group
-    const color = d3.scaleOrdinal()
-      .domain([1, 2, 3])
+    // Fix: Create color scale without type parameters
+    const colorScale = d3.scaleOrdinal()
+      .domain([1, 2, 3].map(String))
       .range(['#1f77b4', '#ff7f0e', '#aec7e8']);
     
+    const getColor = (d: NodeDatum) => colorScale(String(d.group || 1));
+    
     // 2. Create a force simulation with all forces needed
-    const simulation = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink(links).id(d => d.id).distance(60))
+    const simulation = d3.forceSimulation<NodeDatum>(nodes)
+      .force('link', d3.forceLink<NodeDatum, LinkDatum>(links).id(d => d.id).distance(60))
       .force('charge', d3.forceManyBody().strength(-200))
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collision', d3.forceCollide().radius(20))
@@ -75,6 +86,24 @@ function NetworkGraph({ width, height, data }) {
       .attr('stroke-width', 1);
     
     // 4. Create <circle> elements for nodes
+    // Fix: Create drag behavior with proper typing
+    const drag = d3.drag<SVGCircleElement, NodeDatum>()
+      .on('start', (event: d3.D3DragEvent<SVGCircleElement, NodeDatum, NodeDatum>, d: NodeDatum) => {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      })
+      .on('drag', (event: d3.D3DragEvent<SVGCircleElement, NodeDatum, NodeDatum>, d: NodeDatum) => {
+        d.fx = event.x;
+        d.fy = event.y;
+      })
+      .on('end', (event: d3.D3DragEvent<SVGCircleElement, NodeDatum, NodeDatum>, d: NodeDatum) => {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+      });
+    
+    // Create nodes with properly typed drag handler
     const node = svg
       .append('g')
       .attr('class', 'nodes')
@@ -83,14 +112,10 @@ function NetworkGraph({ width, height, data }) {
       .enter()
       .append('circle')
       .attr('r', 8)
-      .attr('fill', d => color(d.group))
-      .call(d3.drag()
-        .on('start', dragStarted)
-        .on('drag', dragged)
-        .on('end', dragEnded)
-      );
+      .attr('fill', getColor)
+      .call(drag);
     
-    // 5. Create <text> labels for nodes (optional, can be removed for cleaner look)
+    // 5. Create <text> labels for nodes
     const label = svg
       .append('g')
       .attr('class', 'labels')
@@ -103,44 +128,26 @@ function NetworkGraph({ width, height, data }) {
       .attr('dx', 12)
       .attr('dy', 4);
     
-    // Drag event handlers
-    function dragStarted(event, d) {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
-      d.fx = d.x;
-      d.fy = d.y;
-    }
-    
-    function dragged(event, d) {
-      d.fx = event.x;
-      d.fy = event.y;
-    }
-    
-    function dragEnded(event, d) {
-      if (!event.active) simulation.alphaTarget(0);
-      d.fx = null;
-      d.fy = null;
-    }
-    
     // 6. Update positions on each tick
     simulation.on('tick', () => {
       link
-        .attr('x1', d => d.source.x)
-        .attr('y1', d => d.source.y)
-        .attr('x2', d => d.target.x)
-        .attr('y2', d => d.target.y);
+        .attr('x1', d => (d.source as NodeDatum).x!)
+        .attr('y1', d => (d.source as NodeDatum).y!)
+        .attr('x2', d => (d.target as NodeDatum).x!)
+        .attr('y2', d => (d.target as NodeDatum).y!);
       
       node
-        .attr('cx', d => d.x)
-        .attr('cy', d => d.y);
+        .attr('cx', d => d.x!)
+        .attr('cy', d => d.y!);
       
       label
-        .attr('x', d => d.x)
-        .attr('y', d => d.y);
+        .attr('x', d => d.x!)
+        .attr('y', d => d.y!);
     });
     
     // Initial heating of the simulation for better layout
     simulation.alpha(1).restart();
-    
+   
   }, [data, width, height]);
 
   return (
