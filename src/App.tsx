@@ -4,7 +4,7 @@ import NetworkGraph from './components/NetworkGraph';
 import DeviceMovements from './components/DeviceMovements';
 import AppHeader from './components/AppHeader';
 import sampleData from './components/data';
-
+import NetworkBandwidthDashboard from './components/BandwidthCHarting';
 // Define the proper data type
 interface TopologyData {
   nodes: Array<{
@@ -40,6 +40,7 @@ const App: React.FC = () => {
               />
             } />
             <Route path="/movements" element={<DeviceMovements />} />
+            <Route path="/NetworkBandwidthDashboard" element={<NetworkBandwidthDashboard />} />
           </Routes>
         </div>
         
